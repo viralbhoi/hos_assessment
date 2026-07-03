@@ -77,5 +77,6 @@ STATIC_URL = 'static/'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+ALLOWED_HOSTS = ['*']
 # CORS Config for React
 CORS_ALLOW_ALL_ORIGINS = True
