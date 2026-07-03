@@ -35,14 +35,14 @@ export default function App() {
     const handleRouteCalculation = async () => {
         setLoading(true);
         try {
-            const response = await fetch(
-                "http://127.0.0.1:8000/api/trips/analyze/",
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(formData),
-                },
-            );
+            const API_BASE_URL =
+                import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+            const response = await fetch(`${API_BASE_URL}/api/trips/analyze/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(formData),
+            });
             const data = await response.json();
             setResult(data);
         } catch (error) {
