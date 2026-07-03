@@ -83,3 +83,7 @@ CORS_ALLOWED_ORIGINS = [
 
 # If you need to allow development locally as well:
 CORS_ALLOWED_ORIGINS.append("http://localhost:5173")
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://hos-assessment.vercel.app",
+]
