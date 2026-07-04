@@ -3,15 +3,25 @@ import base64
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 
-def generate_daily_log_base64(log_date, status_intervals, total_trip_miles, origin_city, dest_city):
-    # Target the high-resolution template verbatim
-    asset_path = os.path.join(os.path.dirname(__file__), 'assets', 'Gemini_Generated_Image_8xvv4o8xvv4o8xvv.png')
-    
-    if not os.path.exists(asset_path):
-        img = Image.new('RGB', (2000, 2000), color='white')
-        img.save(asset_path)
+# ==============================================================================
+# OPTIMIZATION: Load the base template ONCE into memory when the server starts.
+# This prevents RAM spikes and SIGKILL crashes during concurrent API requests.
+# ==============================================================================
+ASSET_PATH = os.path.join(os.path.dirname(__file__), 'assets', 'Gemini_Generated_Image_8xvv4o8xvv4o8xvv.png')
 
-    base_image = Image.open(asset_path).convert("RGB")
+if not os.path.exists(ASSET_PATH):
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(ASSET_PATH), exist_ok=True)
+    _temp_img = Image.new('RGB', (2000, 2000), color='white')
+    _temp_img.save(ASSET_PATH)
+
+# Cache the template in global memory as RGB
+_BASE_TEMPLATE = Image.open(ASSET_PATH).convert("RGB")
+
+
+def generate_daily_log_base64(log_date, status_intervals, total_trip_miles, origin_city, dest_city):
+    # Create a lightweight copy of the cached template for this specific request
+    base_image = _BASE_TEMPLATE.copy()
     draw = ImageDraw.Draw(base_image)
     
     # --- PIXEL-PERFECT ALIGNMENT CALIBRATION ---
@@ -98,6 +108,20 @@ def generate_daily_log_base64(log_date, status_intervals, total_trip_miles, orig
         print(f"Font drawing error: {e}")
         pass 
         
+    # ==============================================================================
+    # OPTIMIZATION: Secure buffer handling and explicit cleanup to prevent PIL errors
+    # ==============================================================================
     buffer = BytesIO()
-    base_image.save(buffer, format="PNG")
-    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+    
+    # Save with optimization to reduce payload size
+    base_image.save(buffer, format="PNG", optimize=True)
+    buffer.seek(0) # Reset pointer to the start of the buffer
+    
+    # Encode and free up memory variables explicitly
+    encoded_image = base64.b64encode(buffer.getvalue()).decode("utf-8")
+    
+    buffer.close()
+    del draw
+    del base_image
+    
+    return encoded_image
