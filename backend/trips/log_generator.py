@@ -2,6 +2,7 @@ import os
 import base64
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
+import tempfile
 
 # ==============================================================================
 # OPTIMIZATION: Load the base template ONCE into memory when the server starts.
@@ -109,19 +110,28 @@ def generate_daily_log_base64(log_date, status_intervals, total_trip_miles, orig
         pass 
         
     # ==============================================================================
-    # OPTIMIZATION: Secure buffer handling and explicit cleanup to prevent PIL errors
+    # THE SYSTEMS FIX: Save to disk instead of RAM to bypass PIL 'fileno' bugs 
+    # and prevent Render Out-Of-Memory / Worker Timeout crashes.
     # ==============================================================================
-    buffer = BytesIO()
+    import tempfile
     
-    # Save with optimization to reduce payload size
-    base_image.save(buffer, format="PNG", optimize=True)
-    buffer.seek(0) # Reset pointer to the start of the buffer
-    
-    # Encode and free up memory variables explicitly
-    encoded_image = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    
-    buffer.close()
-    del draw
-    del base_image
+    # Create a temporary file on Render's disk
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
+        temp_filename = tmp_file.name
+
+    try:
+        # 1. Save directly to disk (No optimize=True to prevent 30s timeouts)
+        base_image.save(temp_filename, format="PNG")
+        
+        # 2. Read the file from disk directly into base64
+        with open(temp_filename, "rb") as image_file:
+            encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
+            
+    finally:
+        # 3. Secure Cleanup: Always delete the temp file and free RAM
+        if os.path.exists(temp_filename):
+            os.remove(temp_filename)
+        del draw
+        del base_image
     
     return encoded_image
